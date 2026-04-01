@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -244,16 +245,19 @@ var MailWatch = common.Shortcut{
 		}
 		info("Mailbox subscribed.")
 
+		unsubscribe := func() {
+			runtime.CallAPI("POST", mailboxPath(mailbox, "event", "unsubscribe"), nil, map[string]interface{}{"event_type": 1}) //nolint:errcheck
+		}
+
 		// Resolve "me" to the actual email address so we can filter events.
 		mailboxFilter := mailbox
 		if mailbox == "me" {
-			if resolved := fetchMailboxPrimaryEmail(runtime, "me"); resolved != "" {
-				mailboxFilter = resolved
-			} else {
-				return output.ErrWithHint(output.ExitAuth, "missing_scope",
-					"unable to resolve mailbox address for event filtering; without this, events from other mailboxes cannot be excluded",
-					"run `lark-cli auth login --scope \"mail:user_mailbox:readonly\"` to grant mailbox profile access")
+			resolved, profileErr := fetchMailboxPrimaryEmail(runtime, "me")
+			if profileErr != nil {
+				unsubscribe()
+				return enhanceProfileError(profileErr)
 			}
+			mailboxFilter = resolved
 		}
 
 		eventCount := 0
@@ -420,12 +424,8 @@ var MailWatch = common.Shortcut{
 			<-sigCh
 			info(fmt.Sprintf("\nShutting down... (received %d events)", eventCount))
 			info("Unsubscribing mailbox events...")
-			_, unsubErr := runtime.CallAPI("POST", mailboxPath(mailbox, "event", "unsubscribe"), nil, map[string]interface{}{"event_type": 1})
-			if unsubErr != nil {
-				fmt.Fprintf(errOut, "Warning: unsubscribe failed: %v\n", unsubErr)
-			} else {
-				info("Mailbox unsubscribed.")
-			}
+			unsubscribe()
+			info("Mailbox unsubscribed.")
 			signal.Stop(sigCh)
 			os.Exit(0)
 		}()
@@ -702,6 +702,24 @@ func wrapWatchSubscribeError(err error) error {
 		return output.ErrWithHint(exitErr.Code, exitErr.Detail.Type, msg, hint)
 	}
 	return output.ErrWithHint(output.ExitAPI, "api_error", fmt.Sprintf("subscribe mailbox events failed: %v", err), hint)
+}
+
+// enhanceProfileError wraps a profile API error with actionable hints.
+// Permission errors get a scope-specific hint; other errors (network, 5xx)
+// are reported as-is so diagnostics aren't misleading.
+func enhanceProfileError(err error) error {
+	var exitErr *output.ExitError
+	if errors.As(err, &exitErr) && exitErr.Detail != nil {
+		errType := exitErr.Detail.Type
+		lower := strings.ToLower(exitErr.Detail.Message)
+		if errType == "permission" || errType == "missing_scope" ||
+			strings.Contains(lower, "permission") || strings.Contains(lower, "scope") {
+			return output.ErrWithHint(output.ExitAuth, "missing_scope",
+				"unable to resolve mailbox address: "+exitErr.Detail.Message,
+				"run `lark-cli auth login --scope \"mail:user_mailbox:readonly\"` to grant mailbox profile access")
+		}
+	}
+	return fmt.Errorf("unable to resolve mailbox address for event filtering: %w", err)
 }
 
 // decodeBodyFieldsForFile returns a shallow copy of outputData with body_html and

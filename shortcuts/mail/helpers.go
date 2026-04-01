@@ -218,24 +218,24 @@ func mailboxPath(mailboxID string, segments ...string) string {
 }
 
 // fetchMailboxPrimaryEmail retrieves mailbox primary_email_address from
-// user_mailboxes.profile. Returns empty string on failure (non-fatal).
-func fetchMailboxPrimaryEmail(runtime *common.RuntimeContext, mailboxID string) string {
+// user_mailboxes.profile. Returns the email address or an error.
+func fetchMailboxPrimaryEmail(runtime *common.RuntimeContext, mailboxID string) (string, error) {
 	if mailboxID == "" {
 		mailboxID = "me"
 	}
 	data, err := runtime.CallAPI("GET", mailboxPath(mailboxID, "profile"), nil, nil)
 	if err != nil {
-		return ""
+		return "", err
 	}
 	if email := extractPrimaryEmail(data); email != "" {
-		return email
+		return email, nil
 	}
 	if nested, ok := data["data"].(map[string]interface{}); ok {
 		if email := extractPrimaryEmail(nested); email != "" {
-			return email
+			return email, nil
 		}
 	}
-	return ""
+	return "", fmt.Errorf("profile API returned no primary_email_address")
 }
 
 func extractPrimaryEmail(data map[string]interface{}) string {
@@ -252,7 +252,8 @@ func extractPrimaryEmail(data map[string]interface{}) string {
 
 // fetchCurrentUserEmail retrieves the current mailbox primary email.
 func fetchCurrentUserEmail(runtime *common.RuntimeContext) string {
-	return fetchMailboxPrimaryEmail(runtime, "me")
+	email, _ := fetchMailboxPrimaryEmail(runtime, "me")
+	return email
 }
 
 // fetchSelfEmailSet returns a set containing the primary email of the given
@@ -264,7 +265,7 @@ func fetchSelfEmailSet(runtime *common.RuntimeContext, mailboxID string) map[str
 		mailboxID = "me"
 	}
 	set := make(map[string]bool)
-	if email := fetchMailboxPrimaryEmail(runtime, mailboxID); email != "" {
+	if email, _ := fetchMailboxPrimaryEmail(runtime, mailboxID); email != "" {
 		set[strings.ToLower(email)] = true
 	}
 	return set
