@@ -22,7 +22,7 @@ import (
 )
 
 var WhiteboardUpdate = common.Shortcut{
-	Service:     "docs",
+	Service:     "whiteboard",
 	Command:     "+whiteboard-update",
 	Description: "Update an existing whiteboard in lark document with whiteboard dsl. Such DSL input from stdin. refer to lark-whiteboard skill for more details.",
 	Risk:        "high-risk-write",
