@@ -251,7 +251,7 @@ func TestBaseRecordValidate(t *testing.T) {
 		t.Fatalf("record list validate should be nil for repeatable --field-id")
 	}
 	if BaseRecordGet.Validate != nil {
-		t.Fatalf("record get validate should be nil for repeatable --field-id")
+		t.Fatalf("record get validate should be nil")
 	}
 	if err := BaseRecordUpsert.Validate(ctx, newBaseTestRuntime(map[string]string{"base-token": "b", "table-id": "tbl_1", "json": `{"Name":"A"}`}, nil, nil)); err != nil {
 		t.Fatalf("upsert validate err=%v", err)

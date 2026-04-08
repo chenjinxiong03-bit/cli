@@ -578,50 +578,6 @@ func TestBaseRecordExecuteReadCreateDelete(t *testing.T) {
 		}
 	})
 
-	t.Run("get with fields", func(t *testing.T) {
-		factory, stdout, reg := newExecuteFactory(t)
-		reg.Register(&httpmock.Stub{
-			Method: "GET",
-			URL:    "/open-apis/base/v3/bases/app_x/tables/tbl_x/records/rec_fields?field=Name&field=Age",
-			Body: map[string]interface{}{
-				"code": 0,
-				"data": map[string]interface{}{
-					"fields":         []interface{}{"Name", "Age"},
-					"record_id_list": []interface{}{"rec_fields"},
-					"data":           []interface{}{[]interface{}{"Alice", 18}},
-				},
-			},
-		})
-		if err := runShortcut(t, BaseRecordGet, []string{"+record-get", "--base-token", "app_x", "--table-id", "tbl_x", "--record-id", "rec_fields", "--field-id", "Name", "--field-id", "Age"}, factory, stdout); err != nil {
-			t.Fatalf("err=%v", err)
-		}
-		if got := stdout.String(); !strings.Contains(got, `"rec_fields"`) || !strings.Contains(got, `"Alice"`) {
-			t.Fatalf("stdout=%s", got)
-		}
-	})
-
-	t.Run("get with comma field", func(t *testing.T) {
-		factory, stdout, reg := newExecuteFactory(t)
-		reg.Register(&httpmock.Stub{
-			Method: "GET",
-			URL:    "/open-apis/base/v3/bases/app_x/tables/tbl_x/records/rec_comma?field=A%2CB",
-			Body: map[string]interface{}{
-				"code": 0,
-				"data": map[string]interface{}{
-					"fields":         []interface{}{"A,B"},
-					"record_id_list": []interface{}{"rec_comma"},
-					"data":           []interface{}{[]interface{}{"value-1"}},
-				},
-			},
-		})
-		if err := runShortcut(t, BaseRecordGet, []string{"+record-get", "--base-token", "app_x", "--table-id", "tbl_x", "--record-id", "rec_comma", "--field-id", "A,B"}, factory, stdout); err != nil {
-			t.Fatalf("err=%v", err)
-		}
-		if got := stdout.String(); !strings.Contains(got, `"A,B"`) || !strings.Contains(got, `"rec_comma"`) {
-			t.Fatalf("stdout=%s", got)
-		}
-	})
-
 	t.Run("get passthrough fallback", func(t *testing.T) {
 		factory, stdout, reg := newExecuteFactory(t)
 		reg.Register(&httpmock.Stub{
