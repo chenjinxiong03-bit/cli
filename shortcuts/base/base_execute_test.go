@@ -813,33 +813,40 @@ func TestBaseViewExecuteReadCreateDeleteAndFilter(t *testing.T) {
 		}
 	})
 
-	t.Run("set-visible-fields-array", func(t *testing.T) {
+	t.Run("get-visible-fields", func(t *testing.T) {
 		factory, stdout, reg := newExecuteFactory(t)
-		registerTokenStub(reg)
-		updateStub := &httpmock.Stub{
-			Method: "PUT",
+		reg.Register(&httpmock.Stub{
+			Method: "GET",
 			URL:    "/open-apis/base/v3/bases/app_x/tables/tbl_x/views/vew_1/visible_fields",
 			Body: map[string]interface{}{
 				"code": 0,
 				"data": []interface{}{"fld_primary", "fld_status"},
 			},
-		}
-		reg.Register(updateStub)
-		if err := runShortcut(t, BaseViewSetVisibleFields, []string{"+view-set-visible-fields", "--base-token", "app_x", "--table-id", "tbl_x", "--view-id", "vew_1", "--json", `["fld_status"]`}, factory, stdout); err != nil {
+		})
+		if err := runShortcut(t, BaseViewGetVisibleFields, []string{"+view-get-visible-fields", "--base-token", "app_x", "--table-id", "tbl_x", "--view-id", "vew_1"}, factory, stdout); err != nil {
 			t.Fatalf("err=%v", err)
 		}
 		if got := stdout.String(); !strings.Contains(got, `"visible_fields"`) || !strings.Contains(got, `"fld_primary"`) {
 			t.Fatalf("stdout=%s", got)
 		}
-		body := string(updateStub.CapturedBody)
-		if !strings.Contains(body, `"visible_fields":["fld_status"]`) {
-			t.Fatalf("request body=%s", body)
+	})
+
+	t.Run("set-visible-fields-array-invalid", func(t *testing.T) {
+		factory, stdout, _ := newExecuteFactory(t)
+		err := runShortcut(
+			t,
+			BaseViewSetVisibleFields,
+			[]string{"+view-set-visible-fields", "--base-token", "app_x", "--table-id", "tbl_x", "--view-id", "vew_1", "--json", `["fld_status"]`},
+			factory,
+			stdout,
+		)
+		if err == nil || !strings.Contains(err.Error(), "invalid JSON object") {
+			t.Fatalf("err=%v", err)
 		}
 	})
 
 	t.Run("set-visible-fields-object", func(t *testing.T) {
 		factory, stdout, reg := newExecuteFactory(t)
-		registerTokenStub(reg)
 		updateStub := &httpmock.Stub{
 			Method: "PUT",
 			URL:    "/open-apis/base/v3/bases/app_x/tables/tbl_x/views/vew_1/visible_fields",

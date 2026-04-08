@@ -20,13 +20,13 @@ var BaseViewSetVisibleFields = common.Shortcut{
 		baseTokenFlag(true),
 		tableRefFlag(true),
 		viewRefFlag(true),
-		{Name: "json", Desc: "visible fields JSON object/array", Required: true},
+		{Name: "json", Desc: "visible fields JSON object with visible_fields", Required: true},
 	},
 	Validate: func(ctx context.Context, runtime *common.RuntimeContext) error {
-		return validateViewJSONValue(runtime)
+		return validateViewVisibleFields(runtime)
 	},
 	DryRun: dryRunViewSetVisibleFields,
 	Execute: func(ctx context.Context, runtime *common.RuntimeContext) error {
-		return executeViewSetWrapped(runtime, "visible_fields", "visible_fields", "visible_fields")
+		return executeViewSetVisibleFields(runtime)
 	},
 }

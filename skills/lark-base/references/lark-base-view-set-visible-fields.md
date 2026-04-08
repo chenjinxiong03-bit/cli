@@ -2,17 +2,9 @@
 
 > **前置条件：** 先阅读 [`../lark-shared/SKILL.md`](../../lark-shared/SKILL.md) 了解认证、全局参数和安全规则。
 
-更新视图可见字段列表。
+更新视图可见字段列表（同时控制视图中的字段顺序）。
 
 ## 推荐命令
-
-```bash
-lark-cli base +view-set-visible-fields \
-  --base-token app_xxx \
-  --table-id tbl_xxx \
-  --view-id viw_xxx \
-  --json '["标题","fld_status"]'
-```
 
 ```bash
 lark-cli base +view-set-visible-fields \
@@ -23,13 +15,6 @@ lark-cli base +view-set-visible-fields \
 ```
 
 ## JSON 结构
-
-```json
-[
-  "标题",
-  "fld_status"
-]
-```
 
 ```json
 {
@@ -44,7 +29,7 @@ lark-cli base +view-set-visible-fields \
 | `--base-token <token>` | 是 | Base Token |
 | `--table-id <id_or_name>` | 是 | 表 ID 或表名 |
 | `--view-id <id_or_name>` | 是 | 视图 ID 或视图名 |
-| `--json <body>` | 是 | JSON 对象或字符串数组 |
+| `--json <body>` | 是 | JSON 对象，且必须包含 `visible_fields` |
 
 ## API 入参详情
 
@@ -64,18 +49,19 @@ PUT /open-apis/base/v3/bases/:base_token/tables/:table_id/views/:view_id/visible
 
 ## 返回重点
 
-- 返回更新后的可见字段列表。
+- 返回更新后的可见字段列表；返回顺序即视图字段展示顺序（受主字段强制置顶规则影响）。
 
 ## 结构规则
 
 - `visible_fields`：字符串数组，每项可传字段 id 或字段名
-- `--json` 可直接传数组 `[...]`，CLI 会自动包装成 `{ "visible_fields": [...] }`
-- `--json` 也可直接传对象 `{ "visible_fields": [...] }`
+- 数组顺序用于控制视图字段顺序（除主字段 `primaryField` 外）
+- `--json` 必须传对象：`{ "visible_fields": [...] }`
 - 后端会强制显示 `primaryField`，并且会把 `primaryField` 放在第一位；CLI 不会在本地补齐或重排
 
 ## 工作流
 
-1. 建议优先使用字段 id，避免字段重名或后续改名带来的歧义。
+1. 用户要求“改字段顺序”或“设置可见字段”时，直接使用本命令。
+2. 建议优先使用字段 id，避免字段重名或后续改名带来的歧义。
 
 ## 坑点
 
