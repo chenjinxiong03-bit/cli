@@ -21,9 +21,6 @@ var BaseRecordBatchUpdate = common.Shortcut{
 		tableRefFlag(true),
 		{Name: "json", Desc: "batch update JSON object, passed through as request body, e.g. {\"record_id_list\":[\"recXXX\"],\"patch\":{\"field_id_or_name\":\"value\"}}", Required: true},
 	},
-	Validate: func(ctx context.Context, runtime *common.RuntimeContext) error {
-		return validateRecordJSON(runtime)
-	},
 	DryRun: dryRunRecordBatchUpdate,
 	Execute: func(ctx context.Context, runtime *common.RuntimeContext) error {
 		return executeRecordBatchUpdate(runtime)

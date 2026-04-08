@@ -21,9 +21,6 @@ var BaseRecordBatchCreate = common.Shortcut{
 		tableRefFlag(true),
 		{Name: "json", Desc: "batch create JSON object, e.g. {\"fields\":[],\"rows\":[]}", Required: true},
 	},
-	Validate: func(ctx context.Context, runtime *common.RuntimeContext) error {
-		return validateRecordJSON(runtime)
-	},
 	DryRun: dryRunRecordBatchCreate,
 	Execute: func(ctx context.Context, runtime *common.RuntimeContext) error {
 		return executeRecordBatchCreate(runtime)

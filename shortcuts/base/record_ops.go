@@ -115,6 +115,7 @@ func validateRecordJSON(runtime *common.RuntimeContext) error {
 func recordListFields(runtime *common.RuntimeContext) []string {
 	return runtime.StrArray("field-id")
 }
+
 func executeRecordList(runtime *common.RuntimeContext) error {
 	offset := runtime.Int("offset")
 	if offset < 0 {
