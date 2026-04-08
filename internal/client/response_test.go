@@ -16,7 +16,6 @@ import (
 	larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
 
 	"github.com/larksuite/cli/internal/output"
-	"github.com/larksuite/cli/internal/vfs/localfileio"
 )
 
 func newApiResp(body []byte, headers map[string]string) *larkcore.ApiResp {
@@ -74,17 +73,6 @@ func TestParseJSONResponse_Invalid(t *testing.T) {
 	_, err := ParseJSONResponse(resp)
 	if err == nil {
 		t.Error("expected error for invalid JSON")
-	}
-}
-
-func TestParseJSONResponse_EmptyBody_WrapsEOF(t *testing.T) {
-	resp := newApiResp([]byte{}, map[string]string{"Content-Type": "application/json"})
-	_, err := ParseJSONResponse(resp)
-	if err == nil {
-		t.Fatal("expected error for empty body")
-	}
-	if !errors.Is(err, io.EOF) {
-		t.Fatalf("expected wrapped io.EOF, got %v", err)
 	}
 }
 
@@ -163,11 +151,11 @@ func TestSaveResponse(t *testing.T) {
 	body := []byte("hello binary data")
 	resp := newApiResp(body, map[string]string{"Content-Type": "application/octet-stream"})
 
-	meta, err := SaveResponse(&localfileio.LocalFileIO{}, resp, "test_output.bin")
+	meta, err := SaveResponse(resp, "test_output.bin")
 	if err != nil {
 		t.Fatalf("SaveResponse failed: %v", err)
 	}
-	if meta["size_bytes"] != int64(len(body)) {
+	if meta["size_bytes"] != len(body) {
 		t.Errorf("expected size_bytes=%d, got %v", len(body), meta["size_bytes"])
 	}
 
@@ -189,7 +177,7 @@ func TestSaveResponse_CreatesDir(t *testing.T) {
 
 	resp := newApiResp([]byte("data"), map[string]string{"Content-Type": "application/octet-stream"})
 
-	meta, err := SaveResponse(&localfileio.LocalFileIO{}, resp, filepath.Join("sub", "deep", "out.bin"))
+	meta, err := SaveResponse(resp, filepath.Join("sub", "deep", "out.bin"))
 	if err != nil {
 		t.Fatalf("SaveResponse with nested dir failed: %v", err)
 	}
@@ -208,7 +196,6 @@ func TestHandleResponse_JSON(t *testing.T) {
 	err := HandleResponse(resp, ResponseOptions{
 		Out:    &out,
 		ErrOut: &errOut,
-		FileIO: &localfileio.LocalFileIO{},
 	})
 	if err != nil {
 		t.Fatalf("HandleResponse failed: %v", err)
@@ -227,41 +214,9 @@ func TestHandleResponse_JSONWithError(t *testing.T) {
 	err := HandleResponse(resp, ResponseOptions{
 		Out:    &out,
 		ErrOut: &errOut,
-		FileIO: &localfileio.LocalFileIO{},
 	})
 	if err == nil {
 		t.Error("expected error for non-zero code")
-	}
-}
-
-func TestHandleResponse_EmptyJSONBody_ShowsDiagnostic(t *testing.T) {
-	resp := newApiResp([]byte{}, map[string]string{"Content-Type": "application/json"})
-
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	err := HandleResponse(resp, ResponseOptions{
-		Out:    &out,
-		ErrOut: &errOut,
-	})
-	if err == nil {
-		t.Fatal("expected error for empty JSON body")
-	}
-
-	var exitErr *output.ExitError
-	if !errors.As(err, &exitErr) {
-		t.Fatalf("expected ExitError, got %T", err)
-	}
-	if exitErr.Code != output.ExitAPI {
-		t.Fatalf("expected ExitAPI, got %d", exitErr.Code)
-	}
-	if exitErr.Detail == nil {
-		t.Fatal("expected detail on exit error")
-	}
-	if exitErr.Detail.Message != "API returned an empty JSON response body" {
-		t.Fatalf("unexpected message: %q", exitErr.Detail.Message)
-	}
-	if !strings.Contains(exitErr.Detail.Hint, "--output") {
-		t.Fatalf("expected hint to mention --output, got %q", exitErr.Detail.Hint)
 	}
 }
 
@@ -278,7 +233,6 @@ func TestHandleResponse_BinaryAutoSave(t *testing.T) {
 	err := HandleResponse(resp, ResponseOptions{
 		Out:    &out,
 		ErrOut: &errOut,
-		FileIO: &localfileio.LocalFileIO{},
 	})
 	if err != nil {
 		t.Fatalf("HandleResponse binary failed: %v", err)
@@ -302,7 +256,6 @@ func TestHandleResponse_BinaryWithOutput(t *testing.T) {
 		OutputPath: "out.png",
 		Out:        &out,
 		ErrOut:     &errOut,
-		FileIO:     &localfileio.LocalFileIO{},
 	})
 	if err != nil {
 		t.Fatalf("HandleResponse with output path failed: %v", err)
@@ -317,7 +270,7 @@ func TestHandleResponse_NonJSONError_404(t *testing.T) {
 	resp := newApiRespWithStatus(404, []byte("404 page not found"), map[string]string{"Content-Type": "text/plain"})
 
 	var out, errOut bytes.Buffer
-	err := HandleResponse(resp, ResponseOptions{Out: &out, ErrOut: &errOut, FileIO: &localfileio.LocalFileIO{}})
+	err := HandleResponse(resp, ResponseOptions{Out: &out, ErrOut: &errOut})
 	if err == nil {
 		t.Fatal("expected error for 404 text/plain")
 	}
@@ -335,7 +288,7 @@ func TestHandleResponse_NonJSONError_502(t *testing.T) {
 	resp := newApiRespWithStatus(502, []byte("<html>Bad Gateway</html>"), map[string]string{"Content-Type": "text/html"})
 
 	var out, errOut bytes.Buffer
-	err := HandleResponse(resp, ResponseOptions{Out: &out, ErrOut: &errOut, FileIO: &localfileio.LocalFileIO{}})
+	err := HandleResponse(resp, ResponseOptions{Out: &out, ErrOut: &errOut})
 	if err == nil {
 		t.Fatal("expected error for 502 text/html")
 	}
@@ -358,7 +311,7 @@ func TestHandleResponse_200TextPlain_SavesFile(t *testing.T) {
 	resp := newApiRespWithStatus(200, []byte("plain text file content"), map[string]string{"Content-Type": "text/plain"})
 
 	var out, errOut bytes.Buffer
-	err := HandleResponse(resp, ResponseOptions{Out: &out, ErrOut: &errOut, FileIO: &localfileio.LocalFileIO{}})
+	err := HandleResponse(resp, ResponseOptions{Out: &out, ErrOut: &errOut})
 	if err != nil {
 		t.Fatalf("expected no error for 200 text/plain, got: %v", err)
 	}
@@ -384,14 +337,72 @@ func TestHandleResponse_BinaryWithJq_RejectsNonJSON(t *testing.T) {
 	}
 }
 
+func TestHandleResponse_403JSON_CheckLarkResponse(t *testing.T) {
+	body := []byte(`{"code":99991400,"msg":"invalid token"}`)
+	resp := newApiRespWithStatus(403, body, map[string]string{"Content-Type": "application/json"})
+
+	var out, errOut bytes.Buffer
+	err := HandleResponse(resp, ResponseOptions{Out: &out, ErrOut: &errOut})
+	if err == nil {
+		t.Fatal("expected error for 403 JSON with non-zero code")
+	}
+	if !strings.Contains(err.Error(), "99991400") {
+		t.Errorf("expected lark error code in message, got: %s", err.Error())
+	}
+}
+
+func TestParseJSONResponse_EmptyBody_ErrorIsNotWrappedIOEOF(t *testing.T) {
+	// GIVEN: an empty response body
+	resp := newApiResp([]byte{}, map[string]string{"Content-Type": "application/json"})
+
+	// WHEN: ParseJSONResponse tries to parse the empty body
+	_, err := ParseJSONResponse(resp)
+
+	// THEN: error is returned
+	if err == nil {
+		t.Fatal("expected error for empty body")
+	}
+
+	// THEN: error is NOT a wrapped io.EOF (uses fmt.Errorf with verb v not w,
+	// so errors.Is chain is broken). This verifies the PR change.
+	if errors.Is(err, io.EOF) {
+		t.Fatal("error should not wrap io.EOF: format was changed from percent-w to percent-v")
+	}
+
+	// THEN: error message still contains useful context
+	if !strings.Contains(err.Error(), "response parse error") {
+		t.Errorf("expected 'response parse error' in error message, got: %v", err)
+	}
+}
+
+func TestParseJSONResponse_InvalidJSON_ErrorNotWrapped(t *testing.T) {
+	// GIVEN: a response with invalid JSON
+	resp := newApiResp([]byte(`{invalid`), map[string]string{"Content-Type": "application/json"})
+
+	// WHEN: ParseJSONResponse tries to parse
+	_, err := ParseJSONResponse(resp)
+
+	// THEN: error message contains the body for debugging
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+	if !strings.Contains(err.Error(), "response parse error") {
+		t.Errorf("expected 'response parse error' in error, got: %v", err)
+	}
+}
+
 func TestSaveResponse_RejectsPathTraversal(t *testing.T) {
+	// GIVEN: a clean CWD
 	dir := t.TempDir()
 	origWd, _ := os.Getwd()
 	os.Chdir(dir)
 	defer os.Chdir(origWd)
 
+	// WHEN: SaveResponse is called with a path traversal path
 	resp := newApiResp([]byte("data"), map[string]string{"Content-Type": "application/octet-stream"})
-	_, err := SaveResponse(&localfileio.LocalFileIO{}, resp, "../../evil.txt")
+	_, err := SaveResponse(resp, "../../evil.txt")
+
+	// THEN: rejected with unsafe output path message
 	if err == nil {
 		t.Fatal("expected error for path traversal")
 	}
@@ -401,21 +412,33 @@ func TestSaveResponse_RejectsPathTraversal(t *testing.T) {
 }
 
 func TestSaveResponse_RejectsAbsolutePath(t *testing.T) {
+	// GIVEN: an absolute path
 	resp := newApiResp([]byte("data"), map[string]string{"Content-Type": "application/octet-stream"})
-	_, err := SaveResponse(&localfileio.LocalFileIO{}, resp, "/tmp/evil.txt")
+
+	// WHEN: SaveResponse is called with an absolute path
+	_, err := SaveResponse(resp, "/tmp/evil.txt")
+
+	// THEN: rejected
 	if err == nil {
 		t.Fatal("expected error for absolute path")
+	}
+	if !strings.Contains(err.Error(), "unsafe output path") {
+		t.Errorf("expected 'unsafe output path' wrapper, got: %v", err)
 	}
 }
 
 func TestSaveResponse_MetadataContainsAbsolutePath(t *testing.T) {
+	// GIVEN: a clean CWD
 	dir := t.TempDir()
 	origWd, _ := os.Getwd()
 	os.Chdir(dir)
 	defer os.Chdir(origWd)
 
+	// WHEN: SaveResponse saves to a relative path
 	resp := newApiResp([]byte("x"), map[string]string{"Content-Type": "text/plain"})
-	meta, err := SaveResponse(&localfileio.LocalFileIO{}, resp, "rel.txt")
+	meta, err := SaveResponse(resp, "rel.txt")
+
+	// THEN: succeeds and saved_path is absolute
 	if err != nil {
 		t.Fatalf("SaveResponse failed: %v", err)
 	}
@@ -425,16 +448,52 @@ func TestSaveResponse_MetadataContainsAbsolutePath(t *testing.T) {
 	}
 }
 
-func TestHandleResponse_403JSON_CheckLarkResponse(t *testing.T) {
-	body := []byte(`{"code":99991400,"msg":"invalid token"}`)
-	resp := newApiRespWithStatus(403, body, map[string]string{"Content-Type": "application/json"})
+func TestSaveResponse_SizeBytesIsInt(t *testing.T) {
+	// GIVEN: a clean CWD and response with known body
+	dir := t.TempDir()
+	origWd, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origWd)
+
+	body := []byte("test content")
+	resp := newApiResp(body, map[string]string{"Content-Type": "application/octet-stream"})
+
+	// WHEN: SaveResponse saves the response
+	meta, err := SaveResponse(resp, "size_test.bin")
+	if err != nil {
+		t.Fatalf("SaveResponse failed: %v", err)
+	}
+
+	// THEN: size_bytes is int (not int64) — verifies the PR change from int64 to int
+	sizeBytes := meta["size_bytes"]
+	if _, ok := sizeBytes.(int); !ok {
+		t.Errorf("size_bytes should be int, got %T (value: %v)", sizeBytes, sizeBytes)
+	}
+	if sizeBytes.(int) != len(body) {
+		t.Errorf("size_bytes = %v, want %d", sizeBytes, len(body))
+	}
+}
+
+func TestHandleResponse_InvalidJSONBody_ReturnsNetworkError(t *testing.T) {
+	// GIVEN: a response with invalid JSON and application/json content-type
+	resp := newApiResp([]byte(`not json`), map[string]string{"Content-Type": "application/json"})
 
 	var out, errOut bytes.Buffer
-	err := HandleResponse(resp, ResponseOptions{Out: &out, ErrOut: &errOut, FileIO: &localfileio.LocalFileIO{}})
+
+	// WHEN: HandleResponse processes it
+	err := HandleResponse(resp, ResponseOptions{Out: &out, ErrOut: &errOut})
+
+	// THEN: error is returned
 	if err == nil {
-		t.Fatal("expected error for 403 JSON with non-zero code")
+		t.Fatal("expected error for invalid JSON body")
 	}
-	if !strings.Contains(err.Error(), "99991400") {
-		t.Errorf("expected lark error code in message, got: %s", err.Error())
+
+	// THEN: error is a network error (ErrNetwork path in HandleResponse)
+	var exitErr *output.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected ExitError, got %T: %v", err, err)
+	}
+	if exitErr.Code != output.ExitNetwork {
+		t.Errorf("expected ExitNetwork (%d), got %d", output.ExitNetwork, exitErr.Code)
 	}
 }

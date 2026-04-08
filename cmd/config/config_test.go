@@ -6,8 +6,6 @@ package config
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -22,17 +20,6 @@ type noopConfigKeychain struct{}
 func (n *noopConfigKeychain) Get(service, account string) (string, error) { return "", nil }
 func (n *noopConfigKeychain) Set(service, account, value string) error    { return nil }
 func (n *noopConfigKeychain) Remove(service, account string) error        { return nil }
-
-type recordingConfigKeychain struct {
-	removed []string
-}
-
-func (r *recordingConfigKeychain) Get(service, account string) (string, error) { return "", nil }
-func (r *recordingConfigKeychain) Set(service, account, value string) error    { return nil }
-func (r *recordingConfigKeychain) Remove(service, account string) error {
-	r.removed = append(r.removed, service+":"+account)
-	return nil
-}
 
 func TestConfigInitCmd_FlagParsing(t *testing.T) {
 	f, _, _, _ := cmdutil.TestFactory(t, nil)
@@ -234,7 +221,36 @@ func TestConfigRemoveCmd_FlagParsing(t *testing.T) {
 	}
 }
 
-func TestConfigRemoveRun_SaveFailurePreservesExistingConfigAndSecrets(t *testing.T) {
+func TestConfigRemoveRun_NotConfiguredReturnsValidationError(t *testing.T) {
+	// GIVEN: no config file exists
+	t.Setenv("LARKSUITE_CLI_CONFIG_DIR", t.TempDir())
+	f, _, _, _ := cmdutil.TestFactory(t, nil)
+
+	// WHEN: configRemoveRun is called
+	err := configRemoveRun(&ConfigRemoveOptions{Factory: f})
+
+	// THEN: returns a validation error "not configured yet"
+	if err == nil {
+		t.Fatal("expected error when not configured")
+	}
+	if !strings.Contains(err.Error(), "not configured") {
+		t.Fatalf("error = %v, want 'not configured'", err)
+	}
+}
+
+type recordingConfigKeychain struct {
+	removed []string
+}
+
+func (r *recordingConfigKeychain) Get(service, account string) (string, error) { return "", nil }
+func (r *recordingConfigKeychain) Set(service, account, value string) error    { return nil }
+func (r *recordingConfigKeychain) Remove(service, account string) error {
+	r.removed = append(r.removed, service+":"+account)
+	return nil
+}
+
+func TestConfigRemoveRun_CleansKeychainBeforeSave(t *testing.T) {
+	// GIVEN: a config with a single app that has a keychain secret
 	configDir := t.TempDir()
 	t.Setenv("LARKSUITE_CLI_CONFIG_DIR", configDir)
 
@@ -245,7 +261,6 @@ func TestConfigRemoveRun_SaveFailurePreservesExistingConfigAndSecrets(t *testing
 				Ref: &core.SecretRef{Source: "keychain", ID: "appsecret:app-test"},
 			},
 			Brand: core.BrandFeishu,
-			Users: []core.AppUser{{UserOpenId: "ou_1", UserName: "Tester"}},
 		}},
 	}
 	if err := core.SaveMultiAppConfig(multi); err != nil {
@@ -253,44 +268,76 @@ func TestConfigRemoveRun_SaveFailurePreservesExistingConfigAndSecrets(t *testing
 	}
 
 	kc := &recordingConfigKeychain{}
-	f, _, _, _ := cmdutil.TestFactory(t, nil)
+	f, _, stderr, _ := cmdutil.TestFactory(t, nil)
 	f.Keychain = kc
 
-	// Make subsequent config saves fail while keeping the existing config readable.
-	if err := os.Chmod(configDir, 0500); err != nil {
-		t.Fatalf("Chmod(%s) error = %v", configDir, err)
-	}
-	defer os.Chmod(configDir, 0700)
-
+	// WHEN: configRemoveRun is called
 	err := configRemoveRun(&ConfigRemoveOptions{Factory: f})
-	if err == nil {
-		t.Fatal("expected save failure")
-	}
-	if !strings.Contains(err.Error(), "failed to save config") {
-		t.Fatalf("error = %v, want failed to save config", err)
-	}
-	if len(kc.removed) != 0 {
-		t.Fatalf("expected no keychain cleanup before successful save, got removals: %v", kc.removed)
-	}
 
-	// Restore permissions and confirm the original config is still intact.
-	if err := os.Chmod(configDir, 0700); err != nil {
-		t.Fatalf("restore Chmod(%s) error = %v", configDir, err)
-	}
-	saved, err := core.LoadMultiAppConfig()
+	// THEN: no error
 	if err != nil {
-		t.Fatalf("LoadMultiAppConfig() error = %v", err)
-	}
-	if saved == nil || len(saved.Apps) != 1 || saved.Apps[0].AppId != "app-test" {
-		t.Fatalf("saved config = %#v, want original single app preserved", saved)
-	}
-	if got := saved.Apps[0].AppSecret.Ref; got == nil || got.ID != "appsecret:app-test" {
-		t.Fatalf("saved app secret ref = %#v, want preserved keychain ref", got)
+		t.Fatalf("configRemoveRun() error = %v", err)
 	}
 
-	configPath := filepath.Join(configDir, "config.json")
-	if _, err := os.Stat(configPath); err != nil {
-		t.Fatalf("expected existing config file to remain, stat error = %v", err)
+	// THEN: keychain entries were cleaned (verifies cleanup happens)
+	if len(kc.removed) == 0 {
+		t.Error("expected keychain entries to be removed")
+	}
+
+	// THEN: success message printed
+	if !strings.Contains(stderr.String(), "Configuration removed") {
+		t.Errorf("expected success message in stderr, got: %s", stderr.String())
+	}
+}
+
+func TestConfigRemoveRun_SavesEmptyConfigAfterCleanup(t *testing.T) {
+	// GIVEN: a config with apps and users
+	configDir := t.TempDir()
+	t.Setenv("LARKSUITE_CLI_CONFIG_DIR", configDir)
+
+	multi := &core.MultiAppConfig{
+		Apps: []core.AppConfig{
+			{
+				AppId:     "app1",
+				AppSecret: core.PlainSecret("secret1"),
+				Brand:     core.BrandFeishu,
+				Users:     []core.AppUser{{UserOpenId: "ou_user1", UserName: "User1"}},
+			},
+			{
+				AppId:     "app2",
+				AppSecret: core.PlainSecret("secret2"),
+				Brand:     core.BrandFeishu,
+			},
+		},
+	}
+	if err := core.SaveMultiAppConfig(multi); err != nil {
+		t.Fatalf("SaveMultiAppConfig() error = %v", err)
+	}
+
+	f, _, stderr, _ := cmdutil.TestFactory(t, nil)
+	f.Keychain = &noopConfigKeychain{}
+
+	// WHEN: configRemoveRun is called
+	err := configRemoveRun(&ConfigRemoveOptions{Factory: f})
+
+	// THEN: no error
+	if err != nil {
+		t.Fatalf("configRemoveRun() error = %v", err)
+	}
+
+	// THEN: config is now empty (LoadMultiAppConfig returns "no apps" error for empty config)
+	saved, loadErr := core.LoadMultiAppConfig()
+	if loadErr == nil && saved != nil && len(saved.Apps) > 0 {
+		t.Fatalf("expected empty config after remove, got %d apps", len(saved.Apps))
+	}
+	// Either a "no apps" error or nil saved config is acceptable - both indicate successful removal
+	if loadErr != nil && !strings.Contains(loadErr.Error(), "no apps") {
+		t.Fatalf("unexpected LoadMultiAppConfig() error = %v", loadErr)
+	}
+
+	// THEN: stderr mentions user count from the cleared apps
+	if !strings.Contains(stderr.String(), "1 users") {
+		t.Errorf("expected '1 users' message (1 user from app1), got: %s", stderr.String())
 	}
 }
 

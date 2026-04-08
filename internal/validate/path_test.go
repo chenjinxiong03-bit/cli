@@ -310,3 +310,75 @@ func TestSafeEnvDirPath_ReturnsNormalizedAbsolutePath(t *testing.T) {
 		t.Fatalf("SafeEnvDirPath() = %q, want %q", got, want)
 	}
 }
+
+// TestSafeEnvDirPath_RejectsControlChars verifies that control characters in
+// environment directory paths are rejected before any filesystem access.
+func TestSafeEnvDirPath_RejectsControlChars(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		path string
+	}{
+		// ── GIVEN: control characters in absolute path → THEN: rejected ──
+		{"null byte", "/tmp/config\x00dir"},
+		{"bell char", "/tmp/config\x07dir"},
+		{"carriage return", "/tmp/config\rdir"},
+
+		// ── GIVEN: dangerous Unicode in absolute path → THEN: rejected ──
+		{"bidi RLO", "/tmp/config\u202Edir"},
+		{"zero width space", "/tmp/config\u200Bdir"},
+		{"BOM", "/tmp/config\uFEFFdir"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			// WHEN: SafeEnvDirPath validates the path with control chars
+			_, err := SafeEnvDirPath(tt.path, "TEST_ENV_DIR")
+
+			// THEN: returns error mentioning the env var name
+			if err == nil {
+				t.Errorf("SafeEnvDirPath(%q) expected error, got nil", tt.path)
+				return
+			}
+			if !strings.Contains(err.Error(), "TEST_ENV_DIR") {
+				t.Errorf("error should mention env name, got: %v", err)
+			}
+		})
+	}
+}
+
+// TestSafeEnvDirPath_ResolvesNonExistentPathViaAncestor verifies that a path
+// with non-existent tail segments is resolved through the nearest existing ancestor.
+func TestSafeEnvDirPath_ResolvesNonExistentPathViaAncestor(t *testing.T) {
+	// GIVEN: an existing base directory
+	base := t.TempDir()
+	base, _ = filepath.EvalSymlinks(base)
+
+	// WHEN: SafeEnvDirPath validates a path with non-existent tail dirs
+	got, err := SafeEnvDirPath(filepath.Join(base, "new", "subdir"), "LARKSUITE_CLI_DATA_DIR")
+
+	// THEN: succeeds and returns the expected canonical path
+	if err != nil {
+		t.Fatalf("unexpected error for non-existent child of existing dir: %v", err)
+	}
+	want := filepath.Join(base, "new", "subdir")
+	if got != want {
+		t.Errorf("SafeEnvDirPath() = %q, want %q", got, want)
+	}
+}
+
+// TestSafeEnvDirPath_AcceptsExistingPath verifies that an existing absolute path
+// is accepted and resolved canonically.
+func TestSafeEnvDirPath_AcceptsExistingPath(t *testing.T) {
+	// GIVEN: an existing directory
+	base := t.TempDir()
+	base, _ = filepath.EvalSymlinks(base)
+
+	// WHEN: SafeEnvDirPath validates the existing directory
+	got, err := SafeEnvDirPath(base, "LARKSUITE_CLI_CONFIG_DIR")
+
+	// THEN: accepted and returns canonical path
+	if err != nil {
+		t.Fatalf("unexpected error for existing directory: %v", err)
+	}
+	if got != base {
+		t.Errorf("SafeEnvDirPath() = %q, want %q", got, base)
+	}
+}

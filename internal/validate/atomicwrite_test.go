@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -142,5 +143,106 @@ func TestAtomicWrite_HandlesCorrectlyUnderConcurrentWrites(t *testing.T) {
 	}
 	if len(got) == 0 {
 		t.Error("file is empty after concurrent writes")
+	}
+}
+
+func TestAtomicWriteFromReader_WritesContentFromReader(t *testing.T) {
+	// GIVEN: a target path and a reader with known content
+	dir := t.TempDir()
+	path := filepath.Join(dir, "from_reader.txt")
+	content := []byte("hello from reader")
+
+	// WHEN: AtomicWriteFromReader writes the reader content
+	n, err := AtomicWriteFromReader(path, strings.NewReader(string(content)), 0644)
+
+	// THEN: no error and bytes count matches
+	if err != nil {
+		t.Fatalf("AtomicWriteFromReader failed: %v", err)
+	}
+	if n != int64(len(content)) {
+		t.Errorf("returned n = %d, want %d", n, len(content))
+	}
+
+	// THEN: file content matches
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+	if string(got) != string(content) {
+		t.Errorf("content = %q, want %q", got, content)
+	}
+}
+
+func TestAtomicWriteFromReader_ReturnsZeroOnError(t *testing.T) {
+	// GIVEN: a path in a non-existent nested directory (guaranteed to fail)
+	path := filepath.Join(t.TempDir(), "nonexistent", "subdir", "file.txt")
+
+	// WHEN: AtomicWriteFromReader fails because parent directory doesn't exist
+	n, err := AtomicWriteFromReader(path, strings.NewReader("data"), 0644)
+
+	// THEN: returns error and zero bytes copied
+	if err == nil {
+		t.Fatal("expected error writing to nonexistent dir")
+	}
+	if n != 0 {
+		t.Errorf("expected n=0 on error, got %d", n)
+	}
+}
+
+func TestAtomicWriteFromReader_SetsPermission(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission test not reliable on Windows")
+	}
+
+	// GIVEN: a target path
+	dir := t.TempDir()
+	path := filepath.Join(dir, "perm_test.bin")
+
+	// WHEN: AtomicWriteFromReader writes with 0600 permission
+	_, err := AtomicWriteFromReader(path, strings.NewReader("data"), 0600)
+	if err != nil {
+		t.Fatalf("AtomicWriteFromReader failed: %v", err)
+	}
+
+	// THEN: file permission is exactly 0600
+	info, _ := os.Stat(path)
+	if perm := info.Mode().Perm(); perm != 0600 {
+		t.Errorf("permission = %04o, want 0600", perm)
+	}
+}
+
+func TestAtomicWriteFromReader_LeavesNoResidualTempFileOnError(t *testing.T) {
+	// GIVEN: a target path in a non-existent nested directory
+	baseDir := t.TempDir()
+	path := filepath.Join(baseDir, "nonexistent", "file.txt")
+
+	// WHEN: AtomicWriteFromReader fails
+	_, _ = AtomicWriteFromReader(path, strings.NewReader("data"), 0644)
+
+	// THEN: no .tmp files are left in the base directory
+	entries, _ := os.ReadDir(baseDir)
+	for _, e := range entries {
+		if filepath.Ext(e.Name()) == ".tmp" {
+			t.Errorf("residual temp file found: %s", e.Name())
+		}
+	}
+}
+
+func TestAtomicWriteFromReader_OverwritesExistingFile(t *testing.T) {
+	// GIVEN: an existing file with old content
+	dir := t.TempDir()
+	path := filepath.Join(dir, "overwrite.txt")
+	AtomicWrite(path, []byte("old content"), 0644)
+
+	// WHEN: AtomicWriteFromReader overwrites with new content
+	_, err := AtomicWriteFromReader(path, strings.NewReader("new content"), 0644)
+	if err != nil {
+		t.Fatalf("AtomicWriteFromReader failed: %v", err)
+	}
+
+	// THEN: file contains new content
+	got, _ := os.ReadFile(path)
+	if string(got) != "new content" {
+		t.Errorf("content = %q, want %q", got, "new content")
 	}
 }
