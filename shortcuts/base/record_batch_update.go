@@ -19,7 +19,11 @@ var BaseRecordBatchUpdate = common.Shortcut{
 	Flags: []common.Flag{
 		baseTokenFlag(true),
 		tableRefFlag(true),
-		{Name: "json", Desc: "batch update JSON object, passed through as request body, e.g. {\"record_id_list\":[\"recXXX\"],\"patch\":{\"field_id_or_name\":\"value\"}}", Required: true},
+		{Name: "json", Desc: "batch update JSON object", Required: true},
+	},
+	Tips: []string{
+		`Example: --json '{"record_id_list":["recXXX"],"patch":{"Status":"Done"}}'`,
+		"Agent hint: use the lark-base skill's record-batch-update guide for usage and limits.",
 	},
 	DryRun: dryRunRecordBatchUpdate,
 	Execute: func(ctx context.Context, runtime *common.RuntimeContext) error {

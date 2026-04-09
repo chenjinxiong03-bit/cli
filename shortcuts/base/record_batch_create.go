@@ -19,7 +19,11 @@ var BaseRecordBatchCreate = common.Shortcut{
 	Flags: []common.Flag{
 		baseTokenFlag(true),
 		tableRefFlag(true),
-		{Name: "json", Desc: "batch create JSON object, e.g. {\"fields\":[],\"rows\":[]}", Required: true},
+		{Name: "json", Desc: "batch create JSON object", Required: true},
+	},
+	Tips: []string{
+		`Example: --json '{"fields":["Title","Status"],"rows":[["Task A","Open"],["Task B","Done"]]}'`,
+		"Agent hint: use the lark-base skill's record-batch-create guide for usage and limits.",
 	},
 	DryRun: dryRunRecordBatchCreate,
 	Execute: func(ctx context.Context, runtime *common.RuntimeContext) error {
