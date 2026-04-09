@@ -26,15 +26,15 @@
 
 ```bash
 lark-cli base +record-list \
-  --base-token app_xxx \
-  --table-id tbl_xxx \
+  --base-token XXXXXX \
+  --table-id tblXXX \
   --offset 0 \
   --limit 100
 
 lark-cli base +record-list \
-  --base-token app_xxx \
-  --table-id tbl_xxx \
-  --view-id viw_xxx \
+  --base-token XXXXXX \
+  --table-id tblXXX \
+  --view-id vewXXX \
   --offset 0 \
   --limit 50
 ```
