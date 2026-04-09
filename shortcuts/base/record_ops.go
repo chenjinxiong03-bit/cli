@@ -53,7 +53,8 @@ func dryRunRecordUpsert(_ context.Context, runtime *common.RuntimeContext) *comm
 }
 
 func dryRunRecordBatchCreate(_ context.Context, runtime *common.RuntimeContext) *common.DryRunAPI {
-	body, _ := parseJSONObject(runtime.Str("json"), "json")
+	pc := newParseCtx(runtime)
+	body, _ := parseJSONObject(pc, runtime.Str("json"), "json")
 	return common.NewDryRunAPI().
 		POST("/open-apis/base/v3/bases/:base_token/tables/:table_id/records/batch_create").
 		Body(body).
@@ -62,7 +63,8 @@ func dryRunRecordBatchCreate(_ context.Context, runtime *common.RuntimeContext) 
 }
 
 func dryRunRecordBatchUpdate(_ context.Context, runtime *common.RuntimeContext) *common.DryRunAPI {
-	body, _ := parseJSONObject(runtime.Str("json"), "json")
+	pc := newParseCtx(runtime)
+	body, _ := parseJSONObject(pc, runtime.Str("json"), "json")
 	return common.NewDryRunAPI().
 		POST("/open-apis/base/v3/bases/:base_token/tables/:table_id/records/batch_update").
 		Body(body).
@@ -145,7 +147,8 @@ func executeRecordUpsert(runtime *common.RuntimeContext) error {
 }
 
 func executeRecordBatchCreate(runtime *common.RuntimeContext) error {
-	body, err := parseJSONObject(runtime.Str("json"), "json")
+	pc := newParseCtx(runtime)
+	body, err := parseJSONObject(pc, runtime.Str("json"), "json")
 	if err != nil {
 		return err
 	}
@@ -159,7 +162,8 @@ func executeRecordBatchCreate(runtime *common.RuntimeContext) error {
 }
 
 func executeRecordBatchUpdate(runtime *common.RuntimeContext) error {
-	body, err := parseJSONObject(runtime.Str("json"), "json")
+	pc := newParseCtx(runtime)
+	body, err := parseJSONObject(pc, runtime.Str("json"), "json")
 	if err != nil {
 		return err
 	}
