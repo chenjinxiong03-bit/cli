@@ -67,8 +67,8 @@ jobs:
             "windows-amd64.zip"   \
             "windows-arm64.zip"
           do
-            grep -q "lark-cli-${VERSION}-${plat}" checksums.txt \
-              || { echo "checksums.txt missing entry for lark-cli-${VERSION}-${plat}"; exit 1; }
+            grep -qE '^[0-9a-fA-F]{64}[[:space:]]+\*?lark-cli-'"${VERSION}"'-'"${plat}"'$' checksums.txt \
+              || { echo "checksums.txt missing valid entry for lark-cli-${VERSION}-${plat}"; exit 1; }
           done
 
       - name: Publish to npm

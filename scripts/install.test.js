@@ -11,6 +11,7 @@ const {
   verifyChecksum,
   getExpectedChecksum,
   ChecksumError,
+  PackageIntegrityError,
 } = require("./install.js");
 
 function mktmpdir() {
@@ -62,6 +63,22 @@ test("getExpectedChecksum: returns hash for listed archive", () => {
       checksumsPath,
     );
     assert.strictEqual(result, knownHash);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("getExpectedChecksum: throws PackageIntegrityError (not ChecksumError) when checksums.txt file is absent", () => {
+  const dir = mktmpdir();
+  try {
+    const missingPath = path.join(dir, "does-not-exist.txt");
+
+    assert.throws(
+      () => getExpectedChecksum("lark-cli-1.0.0-linux-amd64.tar.gz", missingPath),
+      (err) =>
+        err instanceof PackageIntegrityError &&
+        !(err instanceof ChecksumError),
+    );
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
