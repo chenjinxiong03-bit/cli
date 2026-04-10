@@ -209,24 +209,15 @@ var MailWatch = common.Shortcut{
 			if err := vfs.MkdirAll(outputDir, 0700); err != nil {
 				return fmt.Errorf("cannot create output directory %q: %w", outputDir, err)
 			}
-			// TOCTOU mitigation: after MkdirAll, resolve symlinks on the now-existing
-			// directory and re-verify it is still under CWD. This prevents an attacker
-			// from replacing the newly created directory with a symlink between mkdir
-			// and the first write.
-			resolved, err := filepath.EvalSymlinks(outputDir)
+			// TOCTOU mitigation: after MkdirAll the directory now exists, so
+			// re-validate with SafeOutputPath which will EvalSymlinks on the
+			// real path and re-verify CWD containment. This prevents an attacker
+			// from replacing the newly created directory with a symlink between
+			// mkdir and the first write.
+			outputDir, err = validate.SafeOutputPath(outputDir)
 			if err != nil {
-				return fmt.Errorf("cannot resolve output directory: %w", err)
+				return err
 			}
-			cwd, err := os.Getwd()
-			if err != nil {
-				return fmt.Errorf("cannot determine working directory: %w", err)
-			}
-			canonicalCwd, _ := filepath.EvalSymlinks(cwd)
-			rel, err := filepath.Rel(canonicalCwd, resolved)
-			if err != nil || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." {
-				return output.ErrValidation("--output-dir %q resolves outside the current working directory after mkdir (possible symlink attack)", outputDir)
-			}
-			outputDir = resolved
 		}
 		labelIDsInput := runtime.Str("label-ids")
 		folderIDsInput := runtime.Str("folder-ids")
