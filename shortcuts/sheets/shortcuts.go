@@ -16,5 +16,10 @@ func Shortcuts() []common.Shortcut {
 		SheetFind,
 		SheetCreate,
 		SheetExport,
+		SheetAddDimension,
+		SheetInsertDimension,
+		SheetUpdateDimension,
+		SheetMoveDimension,
+		SheetDeleteDimension,
 	}
 }
