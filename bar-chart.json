@@ -1,0 +1,311 @@
+{
+  "version": 2,
+  "nodes": [
+    {
+      "type": "rect",
+      "x": 0,
+      "y": 0,
+      "width": 1000,
+      "height": 600,
+      "fillColor": "#F5F6F7",
+      "borderColor": "transparent"
+    },
+    {
+      "type": "text",
+      "x": 120,
+      "y": 30,
+      "width": 800,
+      "height": "fit-content",
+      "text": "核心竞品最新股价对比 (USD)",
+      "fontSize": 24,
+      "textAlign": "center"
+    },
+    {
+      "type": "text",
+      "x": 40,
+      "y": 80,
+      "width": 80,
+      "height": "fit-content",
+      "text": "股价 (美元)",
+      "fontSize": 14,
+      "textAlign": "center"
+    },
+    {
+      "type": "rect",
+      "x": 119,
+      "y": 90,
+      "width": 2,
+      "height": 390,
+      "fillColor": "#333333",
+      "borderColor": "transparent"
+    },
+    {
+      "type": "rect",
+      "x": 119,
+      "y": 479,
+      "width": 840,
+      "height": 2,
+      "fillColor": "#333333",
+      "borderColor": "transparent"
+    },
+    {
+      "type": "text",
+      "x": 60,
+      "y": 470,
+      "width": 50,
+      "height": 20,
+      "text": "0",
+      "fontSize": 14,
+      "textAlign": "right"
+    },
+    {
+      "type": "rect",
+      "x": 110,
+      "y": 479.5,
+      "width": 10,
+      "height": 1,
+      "fillColor": "#333333",
+      "borderColor": "transparent"
+    },
+    {
+      "type": "text",
+      "x": 60,
+      "y": 382.5,
+      "width": 50,
+      "height": 20,
+      "text": "30",
+      "fontSize": 14,
+      "textAlign": "right"
+    },
+    {
+      "type": "rect",
+      "x": 110,
+      "y": 392,
+      "width": 10,
+      "height": 1,
+      "fillColor": "#333333",
+      "borderColor": "transparent"
+    },
+    {
+      "type": "rect",
+      "x": 120,
+      "y": 392,
+      "width": 800,
+      "height": 1,
+      "fillColor": "#CCCCCC",
+      "borderColor": "transparent"
+    },
+    {
+      "type": "text",
+      "x": 60,
+      "y": 295,
+      "width": 50,
+      "height": 20,
+      "text": "60",
+      "fontSize": 14,
+      "textAlign": "right"
+    },
+    {
+      "type": "rect",
+      "x": 110,
+      "y": 304.5,
+      "width": 10,
+      "height": 1,
+      "fillColor": "#333333",
+      "borderColor": "transparent"
+    },
+    {
+      "type": "rect",
+      "x": 120,
+      "y": 304.5,
+      "width": 800,
+      "height": 1,
+      "fillColor": "#CCCCCC",
+      "borderColor": "transparent"
+    },
+    {
+      "type": "text",
+      "x": 60,
+      "y": 207.5,
+      "width": 50,
+      "height": 20,
+      "text": "90",
+      "fontSize": 14,
+      "textAlign": "right"
+    },
+    {
+      "type": "rect",
+      "x": 110,
+      "y": 217,
+      "width": 10,
+      "height": 1,
+      "fillColor": "#333333",
+      "borderColor": "transparent"
+    },
+    {
+      "type": "rect",
+      "x": 120,
+      "y": 217,
+      "width": 800,
+      "height": 1,
+      "fillColor": "#CCCCCC",
+      "borderColor": "transparent"
+    },
+    {
+      "type": "text",
+      "x": 60,
+      "y": 120,
+      "width": 50,
+      "height": 20,
+      "text": "120",
+      "fontSize": 14,
+      "textAlign": "right"
+    },
+    {
+      "type": "rect",
+      "x": 110,
+      "y": 129.5,
+      "width": 10,
+      "height": 1,
+      "fillColor": "#333333",
+      "borderColor": "transparent"
+    },
+    {
+      "type": "rect",
+      "x": 120,
+      "y": 129.5,
+      "width": 800,
+      "height": 1,
+      "fillColor": "#CCCCCC",
+      "borderColor": "transparent"
+    },
+    {
+      "type": "rect",
+      "id": "bar-0",
+      "x": 150,
+      "y": 169.8125,
+      "width": 140,
+      "height": 310.1875,
+      "fillColor": "#F06932",
+      "borderColor": "transparent",
+      "borderRadius": 4
+    },
+    {
+      "type": "text",
+      "x": 150,
+      "y": 144.8125,
+      "width": 140,
+      "height": 20,
+      "text": "$106.35",
+      "fontSize": 16,
+      "textAlign": "center",
+      "textColor": "#F06932"
+    },
+    {
+      "type": "text",
+      "x": 150,
+      "y": 495,
+      "width": 140,
+      "height": 30,
+      "text": "Deckers (Hoka)",
+      "fontSize": 16,
+      "textAlign": "center"
+    },
+    {
+      "type": "rect",
+      "id": "bar-1",
+      "x": 350,
+      "y": 244.7125,
+      "width": 140,
+      "height": 235.2875,
+      "fillColor": "#8F959E",
+      "borderColor": "transparent",
+      "borderRadius": 4
+    },
+    {
+      "type": "text",
+      "x": 350,
+      "y": 219.7125,
+      "width": 140,
+      "height": 20,
+      "text": "$80.67",
+      "fontSize": 16,
+      "textAlign": "center",
+      "textColor": "#8F959E"
+    },
+    {
+      "type": "text",
+      "x": 350,
+      "y": 495,
+      "width": 140,
+      "height": 30,
+      "text": "Adidas",
+      "fontSize": 16,
+      "textAlign": "center"
+    },
+    {
+      "type": "rect",
+      "id": "bar-2",
+      "x": 550,
+      "y": 351.55,
+      "width": 140,
+      "height": 128.45,
+      "fillColor": "#3370FF",
+      "borderColor": "transparent",
+      "borderRadius": 4
+    },
+    {
+      "type": "text",
+      "x": 550,
+      "y": 326.55,
+      "width": 140,
+      "height": 20,
+      "text": "$44.04",
+      "fontSize": 16,
+      "textAlign": "center",
+      "textColor": "#3370FF"
+    },
+    {
+      "type": "text",
+      "x": 550,
+      "y": 495,
+      "width": 140,
+      "height": 30,
+      "text": "Nike",
+      "fontSize": 16,
+      "textAlign": "center"
+    },
+    {
+      "type": "rect",
+      "id": "bar-3",
+      "x": 750,
+      "y": 381.3875,
+      "width": 140,
+      "height": 98.6125,
+      "fillColor": "#F06932",
+      "borderColor": "transparent",
+      "borderRadius": 4
+    },
+    {
+      "type": "text",
+      "x": 750,
+      "y": 356.3875,
+      "width": 140,
+      "height": 20,
+      "text": "$33.81",
+      "fontSize": 16,
+      "textAlign": "center",
+      "textColor": "#F06932"
+    },
+    {
+      "type": "text",
+      "x": 750,
+      "y": 495,
+      "width": 140,
+      "height": 30,
+      "text": "On Holding",
+      "fontSize": 16,
+      "textAlign": "center"
+    }
+  ]
+}

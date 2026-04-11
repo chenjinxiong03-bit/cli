@@ -5,27 +5,19 @@ package doc
 
 import (
 	"context"
-	"strings"
+	"fmt"
 
 	"github.com/larksuite/cli/shortcuts/common"
 )
 
-var validModes = map[string]bool{
-	"append":        true,
-	"overwrite":     true,
-	"replace_range": true,
-	"replace_all":   true,
-	"insert_before": true,
-	"insert_after":  true,
-	"delete_range":  true,
-}
-
-var needsSelection = map[string]bool{
-	"replace_range": true,
-	"replace_all":   true,
-	"insert_before": true,
-	"insert_after":  true,
-	"delete_range":  true,
+var validCommands = []string{
+	"str_replace",
+	"str_delete",
+	"block_delete",
+	"block_insert_after",
+	"block_replace",
+	"overwrite",
+	"append",
 }
 
 var DocsUpdate = common.Shortcut{
@@ -37,122 +29,117 @@ var DocsUpdate = common.Shortcut{
 	AuthTypes:   []string{"user", "bot"},
 	Flags: []common.Flag{
 		{Name: "doc", Desc: "document URL or token", Required: true},
-		{Name: "mode", Desc: "update mode: append | overwrite | replace_range | replace_all | insert_before | insert_after | delete_range", Required: true},
-		{Name: "markdown", Desc: "new content (Lark-flavored Markdown; create blank whiteboards with <whiteboard type=\"blank\"></whiteboard>, repeat to create multiple boards)", Input: []string{common.File, common.Stdin}},
-		{Name: "selection-with-ellipsis", Desc: "content locator (e.g. 'start...end')"},
-		{Name: "selection-by-title", Desc: "title locator (e.g. '## Section')"},
-		{Name: "new-title", Desc: "also update document title"},
+		{Name: "command", Desc: "operation: str_replace | str_delete | block_delete | block_insert_after | block_replace | overwrite | append", Required: true, Enum: validCommands},
+		{Name: "doc-format", Desc: "content format（prefer XML）", Default: "xml", Enum: []string{"xml", "markdown"}},
+		{Name: "content", Desc: "new content (XML or Markdown)", Input: []string{common.File, common.Stdin}},
+		{Name: "pattern", Desc: "regex pattern for str_replace / str_delete"},
+		{Name: "block-id", Desc: "target block ID for block_* operations"},
+		{Name: "revision-id", Desc: "base revision (-1 = latest)", Type: "int", Default: "-1"},
 	},
 	Validate: func(ctx context.Context, runtime *common.RuntimeContext) error {
-		mode := runtime.Str("mode")
-		if !validModes[mode] {
-			return common.FlagErrorf("invalid --mode %q, valid: append | overwrite | replace_range | replace_all | insert_before | insert_after | delete_range", mode)
-		}
+		cmd := runtime.Str("command")
+		content := runtime.Str("content")
+		pattern := runtime.Str("pattern")
+		blockID := runtime.Str("block-id")
 
-		if mode != "delete_range" && runtime.Str("markdown") == "" {
-			return common.FlagErrorf("--%s mode requires --markdown", mode)
+		switch cmd {
+		case "str_replace":
+			if pattern == "" {
+				return common.FlagErrorf("--command str_replace requires --pattern")
+			}
+			if content == "" {
+				return common.FlagErrorf("--command str_replace requires --content")
+			}
+		case "str_delete":
+			if pattern == "" {
+				return common.FlagErrorf("--command str_delete requires --pattern")
+			}
+		case "block_delete":
+			if blockID == "" {
+				return common.FlagErrorf("--command block_delete requires --block-id")
+			}
+		case "block_insert_after":
+			if blockID == "" {
+				return common.FlagErrorf("--command block_insert_after requires --block-id")
+			}
+			if content == "" {
+				return common.FlagErrorf("--command block_insert_after requires --content")
+			}
+		case "block_replace":
+			if blockID == "" {
+				return common.FlagErrorf("--command block_replace requires --block-id")
+			}
+			if content == "" {
+				return common.FlagErrorf("--command block_replace requires --content")
+			}
+		case "overwrite":
+			if content == "" {
+				return common.FlagErrorf("--command overwrite requires --content")
+			}
+		case "append":
+			if content == "" {
+				return common.FlagErrorf("--command append requires --content")
+			}
 		}
-
-		selEllipsis := runtime.Str("selection-with-ellipsis")
-		selTitle := runtime.Str("selection-by-title")
-		if selEllipsis != "" && selTitle != "" {
-			return common.FlagErrorf("--selection-with-ellipsis and --selection-by-title are mutually exclusive")
-		}
-
-		if needsSelection[mode] && selEllipsis == "" && selTitle == "" {
-			return common.FlagErrorf("--%s mode requires --selection-with-ellipsis or --selection-by-title", mode)
-		}
-
 		return nil
 	},
 	DryRun: func(ctx context.Context, runtime *common.RuntimeContext) *common.DryRunAPI {
-		args := map[string]interface{}{
-			"doc_id": runtime.Str("doc"),
-			"mode":   runtime.Str("mode"),
+		ref, err := parseDocumentRef(runtime.Str("doc"))
+		if err != nil {
+			return common.NewDryRunAPI().Desc(fmt.Sprintf("error: %v", err))
 		}
-		if v := runtime.Str("markdown"); v != "" {
-			args["markdown"] = v
-		}
-		if v := runtime.Str("selection-with-ellipsis"); v != "" {
-			args["selection_with_ellipsis"] = v
-		}
-		if v := runtime.Str("selection-by-title"); v != "" {
-			args["selection_by_title"] = v
-		}
-		if v := runtime.Str("new-title"); v != "" {
-			args["new_title"] = v
-		}
+		body := buildUpdateBody(runtime)
+		apiPath := fmt.Sprintf("/open-apis/docs_ai/v1/documents/%s", ref.Token)
 		return common.NewDryRunAPI().
-			POST(common.MCPEndpoint(runtime.Config.Brand)).
-			Desc("MCP tool: update-doc").
-			Body(map[string]interface{}{"method": "tools/call", "params": map[string]interface{}{"name": "update-doc", "arguments": args}}).
-			Set("mcp_tool", "update-doc").Set("args", args)
+			PUT(apiPath).
+			Desc("OpenAPI: update document").
+			Body(body).
+			Set("document_id", ref.Token)
 	},
 	Execute: func(ctx context.Context, runtime *common.RuntimeContext) error {
-		args := map[string]interface{}{
-			"doc_id": runtime.Str("doc"),
-			"mode":   runtime.Str("mode"),
-		}
-		if v := runtime.Str("markdown"); v != "" {
-			args["markdown"] = v
-		}
-		if v := runtime.Str("selection-with-ellipsis"); v != "" {
-			args["selection_with_ellipsis"] = v
-		}
-		if v := runtime.Str("selection-by-title"); v != "" {
-			args["selection_by_title"] = v
-		}
-		if v := runtime.Str("new-title"); v != "" {
-			args["new_title"] = v
-		}
-
-		result, err := common.CallMCPTool(runtime, "update-doc", args)
+		ref, err := parseDocumentRef(runtime.Str("doc"))
 		if err != nil {
 			return err
 		}
 
-		normalizeDocsUpdateResult(result, runtime.Str("markdown"))
-		runtime.Out(result, nil)
+		apiPath := fmt.Sprintf("/open-apis/docs_ai/v1/documents/%s", ref.Token)
+		body := buildUpdateBody(runtime)
+
+		data, err := doDocAPI(runtime, "PUT", apiPath, body)
+		if err != nil {
+			return err
+		}
+
+		runtime.OutRaw(data, nil)
 		return nil
 	},
 }
 
-func normalizeDocsUpdateResult(result map[string]interface{}, markdown string) {
-	if !isWhiteboardCreateMarkdown(markdown) {
-		return
-	}
-	result["board_tokens"] = normalizeBoardTokens(result["board_tokens"])
-}
+func buildUpdateBody(runtime *common.RuntimeContext) map[string]interface{} {
+	cmd := runtime.Str("command")
 
-func isWhiteboardCreateMarkdown(markdown string) bool {
-	lower := strings.ToLower(markdown)
-	if strings.Contains(lower, "```mermaid") || strings.Contains(lower, "```plantuml") {
-		return true
+	// append is a shorthand for block_insert_after with block_id "-1" (end of document)
+	blockID := runtime.Str("block-id")
+	if cmd == "append" {
+		cmd = "block_insert_after"
+		blockID = "-1"
 	}
-	return strings.Contains(lower, "<whiteboard") &&
-		(strings.Contains(lower, `type="blank"`) || strings.Contains(lower, `type='blank'`))
-}
 
-func normalizeBoardTokens(raw interface{}) []string {
-	switch v := raw.(type) {
-	case nil:
-		return []string{}
-	case []string:
-		return v
-	case []interface{}:
-		tokens := make([]string, 0, len(v))
-		for _, item := range v {
-			if s, ok := item.(string); ok && s != "" {
-				tokens = append(tokens, s)
-			}
-		}
-		return tokens
-	case string:
-		if v == "" {
-			return []string{}
-		}
-		return []string{v}
-	default:
-		return []string{}
+	body := map[string]interface{}{
+		"format":  runtime.Str("doc-format"),
+		"command": cmd,
 	}
+	if v := runtime.Int("revision-id"); v != 0 {
+		body["revision_id"] = v
+	}
+	if v := runtime.Str("content"); v != "" {
+		body["content"] = v
+	}
+	if v := runtime.Str("pattern"); v != "" {
+		body["pattern"] = v
+	}
+	if blockID != "" {
+		body["block_id"] = blockID
+	}
+	return body
 }
