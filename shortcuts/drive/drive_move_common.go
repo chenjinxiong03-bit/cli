@@ -72,7 +72,11 @@ func (s driveTaskCheckStatus) Ready() bool {
 }
 
 func (s driveTaskCheckStatus) Failed() bool {
-	return strings.EqualFold(strings.TrimSpace(s.Status), "failed")
+	status := strings.TrimSpace(s.Status)
+	// The shared task_check endpoint is reused by multiple async flows. Some
+	// backends return "failed", while folder delete can return the shorter
+	// terminal state "fail".
+	return strings.EqualFold(status, "failed") || strings.EqualFold(status, "fail")
 }
 
 func (s driveTaskCheckStatus) Pending() bool {
