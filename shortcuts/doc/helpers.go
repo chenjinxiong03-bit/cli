@@ -67,8 +67,6 @@ func doDocAPI(runtime *common.RuntimeContext, method, apiPath string, body inter
 		if option.Header == nil {
 			option.Header = make(http.Header)
 		}
-		option.Header.Set("X-TT-ENV", "ppe_general_agent_maoyan")
-		option.Header.Set("env", "pre_release")
 	}
 	return runtime.DoAPIJSON(method, apiPath, nil, body, boeHeader)
 }
