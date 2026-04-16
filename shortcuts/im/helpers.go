@@ -581,6 +581,7 @@ func parseMediaDuration(runtime *common.RuntimeContext, filePath, fileType strin
 type mediaBuffer struct {
 	data []byte
 	ext  string // file extension including leading dot, e.g. ".mp4"
+	name string // original file name extracted from the source URL
 }
 
 // newMediaBuffer downloads URL content into memory via downloadURLToReader.
@@ -595,7 +596,7 @@ func newMediaBuffer(ctx context.Context, runtime *common.RuntimeContext, rawURL 
 	if err != nil {
 		return nil, fmt.Errorf("download failed: %w", err)
 	}
-	return &mediaBuffer{data: data, ext: ext}, nil
+	return &mediaBuffer{data: data, ext: ext, name: fileNameFromURL(rawURL)}, nil
 }
 
 // Reader returns a new io.Reader over the buffered data. Each call returns a
@@ -605,9 +606,9 @@ func (b *mediaBuffer) Reader() io.Reader {
 	return bytes.NewReader(b.data)
 }
 
-// FileName returns a synthetic file name based on the URL extension.
+// FileName returns the original file name extracted from the source URL.
 func (b *mediaBuffer) FileName() string {
-	return "media" + b.ext
+	return b.name
 }
 
 // FileType returns the IM file type detected from the extension.
