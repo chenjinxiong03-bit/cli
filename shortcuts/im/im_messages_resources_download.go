@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -68,7 +69,8 @@ var ImMessagesResourcesDownload = common.Shortcut{
 			return output.ErrValidation("invalid output path: %s", err)
 		}
 
-		finalPath, sizeBytes, err := downloadIMResourceToPath(ctx, runtime, messageId, fileKey, fileType, relPath)
+		userSpecifiedOutput := runtime.Str("output") != ""
+		finalPath, sizeBytes, err := downloadIMResourceToPath(ctx, runtime, messageId, fileKey, fileType, relPath, userSpecifiedOutput)
 		if err != nil {
 			return err
 		}
@@ -135,7 +137,7 @@ var imMimeToExt = map[string]string{
 	"application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
 }
 
-func downloadIMResourceToPath(ctx context.Context, runtime *common.RuntimeContext, messageID, fileKey, fileType, safePath string) (string, int64, error) {
+func downloadIMResourceToPath(ctx context.Context, runtime *common.RuntimeContext, messageID, fileKey, fileType, safePath string, userSpecifiedOutput bool) (string, int64, error) {
 	query := larkcore.QueryParams{}
 	query.Set("type", fileType)
 	downloadResp, err := runtime.DoAPIStream(ctx, &larkcore.ApiReq{
@@ -160,16 +162,7 @@ func downloadIMResourceToPath(ctx context.Context, runtime *common.RuntimeContex
 		return "", 0, output.ErrNetwork("download failed: HTTP %d", downloadResp.StatusCode)
 	}
 
-	// Auto-detect extension from Content-Type if missing
-	finalPath := safePath
-	if filepath.Ext(safePath) == "" {
-		contentType := downloadResp.Header.Get("Content-Type")
-		mimeType := strings.Split(contentType, ";")[0]
-		mimeType = strings.TrimSpace(mimeType)
-		if ext, ok := imMimeToExt[mimeType]; ok {
-			finalPath = safePath + ext
-		}
-	}
+	finalPath := resolveIMResourceDownloadPath(safePath, downloadResp.Header.Get("Content-Type"), downloadResp.Header.Get("Content-Disposition"), userSpecifiedOutput)
 
 	result, err := runtime.FileIO().Save(finalPath, fileio.SaveOptions{
 		ContentType:   downloadResp.Header.Get("Content-Type"),
@@ -186,4 +179,57 @@ func downloadIMResourceToPath(ctx context.Context, runtime *common.RuntimeContex
 		savedPath = finalPath
 	}
 	return savedPath, result.Size(), nil
+}
+
+func resolveIMResourceDownloadPath(safePath, contentType, contentDisposition string, userSpecifiedOutput bool) string {
+	if filepath.Ext(safePath) != "" {
+		return safePath
+	}
+	if cdFilename := parseContentDispositionFilename(contentDisposition); cdFilename != "" {
+		if !userSpecifiedOutput {
+			dir := filepath.Dir(safePath)
+			if dir == "." {
+				return cdFilename
+			}
+			return filepath.Join(dir, cdFilename)
+		}
+		if ext := filepath.Ext(cdFilename); ext != "" {
+			return safePath + ext
+		}
+	}
+	mimeType := strings.TrimSpace(strings.Split(contentType, ";")[0])
+	if ext, ok := imMimeToExt[mimeType]; ok {
+		return safePath + ext
+	}
+	return safePath
+}
+
+// parseContentDispositionFilename extracts and sanitizes the filename from a
+// Content-Disposition header. It handles RFC 5987 encoded filenames (filename*)
+// with priority over plain filename via the standard mime package.
+// Returns an empty string if no valid filename can be extracted.
+func parseContentDispositionFilename(header string) string {
+	if header == "" {
+		return ""
+	}
+	_, params, err := mime.ParseMediaType(header)
+	if err != nil {
+		return ""
+	}
+	name := strings.TrimSpace(params["filename"])
+	if name == "" {
+		return ""
+	}
+	if i := strings.LastIndexAny(name, "/\\"); i >= 0 {
+		name = name[i+1:]
+	}
+	if name == "" || name == "." || name == ".." {
+		return ""
+	}
+	for _, r := range name {
+		if r < 0x20 || r == 0x7f {
+			return ""
+		}
+	}
+	return name
 }

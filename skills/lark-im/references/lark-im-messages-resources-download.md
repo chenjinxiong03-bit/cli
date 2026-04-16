@@ -34,7 +34,7 @@ lark-cli im +messages-resources-download --message-id om_xxx --file-key img_v3_x
 | `--message-id <id>` | Yes | Message ID (`om_xxx` format) |
 | `--file-key <key>` | Yes | Resource key (`img_xxx` or `file_xxx`) |
 | `--type <type>` | Yes | Resource type: `image` or `file` |
-| `--output <path>` | No | Output path (relative paths only; `..` traversal is not allowed; defaults to `file_key` as the file name) |
+| `--output <path>` | No | Output path (relative paths only; `..` traversal is not allowed). When omitted, the server's original filename from `Content-Disposition` is used if available; otherwise defaults to `file_key`. File extension is automatically inferred from `Content-Disposition` or `Content-Type` if not provided |
 | `--as <identity>` | No | Identity type: `user` (default) or `bot` |
 | `--dry-run` | No | Print the request only, do not execute it |
 

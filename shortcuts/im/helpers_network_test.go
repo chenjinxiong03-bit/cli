@@ -247,7 +247,7 @@ func TestDownloadIMResourceToPathSuccess(t *testing.T) {
 	cmdutil.TestChdir(t, t.TempDir())
 
 	target := filepath.Join("nested", "resource.bin")
-	_, size, err := downloadIMResourceToPath(context.Background(), runtime, "om_123", "file_123", "file", target)
+	_, size, err := downloadIMResourceToPath(context.Background(), runtime, "om_123", "file_123", "file", target, true)
 	if err != nil {
 		t.Fatalf("downloadIMResourceToPath() error = %v", err)
 	}
@@ -275,6 +275,43 @@ func TestDownloadIMResourceToPathSuccess(t *testing.T) {
 	}
 }
 
+func TestDownloadIMResourceToPathImageUsesSingleRequestWithoutRange(t *testing.T) {
+	var gotHeaders http.Header
+	payload := []byte("image download")
+	runtime := newBotShortcutRuntime(t, shortcutRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		switch {
+		case strings.Contains(req.URL.Path, "/open-apis/im/v1/messages/om_img/resources/img_123"):
+			gotHeaders = req.Header.Clone()
+			return shortcutRawResponse(200, payload, http.Header{"Content-Type": []string{"image/png"}}), nil
+		default:
+			return nil, fmt.Errorf("unexpected request: %s", req.URL.String())
+		}
+	}))
+
+	cmdutil.TestChdir(t, t.TempDir())
+
+	gotPath, size, err := downloadIMResourceToPath(context.Background(), runtime, "om_img", "img_123", "image", "image", true)
+	if err != nil {
+		t.Fatalf("downloadIMResourceToPath() error = %v", err)
+	}
+	if size != int64(len(payload)) {
+		t.Fatalf("downloadIMResourceToPath() size = %d, want %d", size, len(payload))
+	}
+	if gotHeaders.Get("Range") != "" {
+		t.Fatalf("Range header = %q, want empty", gotHeaders.Get("Range"))
+	}
+	if !strings.HasSuffix(gotPath, "image.png") {
+		t.Fatalf("saved path = %q, want suffix %q", gotPath, "image.png")
+	}
+	data, err := os.ReadFile("image.png")
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if string(data) != string(payload) {
+		t.Fatalf("downloaded payload = %q, want %q", string(data), string(payload))
+	}
+}
+
 func TestDownloadIMResourceToPathHTTPErrorBody(t *testing.T) {
 	runtime := newBotShortcutRuntime(t, shortcutRoundTripFunc(func(req *http.Request) (*http.Response, error) {
 		switch {
@@ -287,7 +324,7 @@ func TestDownloadIMResourceToPathHTTPErrorBody(t *testing.T) {
 
 	cmdutil.TestChdir(t, t.TempDir())
 
-	_, _, err := downloadIMResourceToPath(context.Background(), runtime, "om_403", "file_403", "file", "out.bin")
+	_, _, err := downloadIMResourceToPath(context.Background(), runtime, "om_403", "file_403", "file", "out.bin", true)
 	if err == nil || !strings.Contains(err.Error(), "HTTP 403: denied") {
 		t.Fatalf("downloadIMResourceToPath() error = %v", err)
 	}
