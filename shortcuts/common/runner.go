@@ -866,7 +866,7 @@ func registerShortcutFlags(cmd *cobra.Command, s *Shortcut) {
 		}
 		if len(fl.Enum) > 0 {
 			vals := fl.Enum
-			_ = cmd.RegisterFlagCompletionFunc(fl.Name, func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+			cmdutil.RegisterFlagCompletion(cmd, fl.Name, func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 				return vals, cobra.ShellCompDirectiveNoFileComp
 			})
 		}
@@ -882,11 +882,11 @@ func registerShortcutFlags(cmd *cobra.Command, s *Shortcut) {
 	cmd.Flags().StringP("jq", "q", "", "jq expression to filter JSON output")
 	cmd.Flags().String("as", s.AuthTypes[0], "identity type: user | bot")
 
-	_ = cmd.RegisterFlagCompletionFunc("as", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	cmdutil.RegisterFlagCompletion(cmd, "as", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return s.AuthTypes, cobra.ShellCompDirectiveNoFileComp
 	})
 	if s.HasFormat {
-		_ = cmd.RegisterFlagCompletionFunc("format", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		cmdutil.RegisterFlagCompletion(cmd, "format", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 			return []string{"json", "pretty", "table", "ndjson", "csv"}, cobra.ShellCompDirectiveNoFileComp
 		})
 	}
