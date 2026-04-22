@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"sort"
 )
 
@@ -15,6 +16,29 @@ import (
 var knownArrayFields = []string{
 	"items", "files", "events", "rooms", "records", "nodes",
 	"members", "departments", "calendar_list", "acl_list", "freebusy_list",
+	"chats", "messages", "tasks", "created_tasks",
+}
+
+// asGenericSlice converts any slice value into []interface{}.
+// Returns the slice and true when v is a slice, regardless of element type
+// ([]interface{}, []map[string]interface{}, []MyStruct, etc.). This keeps
+// formatter logic working when business code uses typed slices.
+func asGenericSlice(v interface{}) ([]interface{}, bool) {
+	if v == nil {
+		return nil, false
+	}
+	if s, ok := v.([]interface{}); ok {
+		return s, true
+	}
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Slice {
+		return nil, false
+	}
+	out := make([]interface{}, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		out[i] = rv.Index(i).Interface()
+	}
+	return out, true
 }
 
 // FindArrayField finds the primary array field in a response's data object.
@@ -23,7 +47,7 @@ var knownArrayFields = []string{
 func FindArrayField(data map[string]interface{}) string {
 	for _, name := range knownArrayFields {
 		if arr, ok := data[name]; ok {
-			if _, isArr := arr.([]interface{}); isArr {
+			if _, isArr := asGenericSlice(arr); isArr {
 				return name
 			}
 		}
@@ -31,7 +55,7 @@ func FindArrayField(data map[string]interface{}) string {
 	// Fallback: lexicographically first array field (deterministic)
 	var candidates []string
 	for k, v := range data {
-		if _, isArr := v.([]interface{}); isArr {
+		if _, isArr := asGenericSlice(v); isArr {
 			candidates = append(candidates, k)
 		}
 	}
@@ -68,11 +92,12 @@ func toGeneric(v interface{}) interface{} {
 //  1. Lark API envelope: result["data"][arrayField]  (e.g. {"code":0,"data":{"items":[…]}})
 //  2. Direct map: result[arrayField]                 (e.g. {"members":[…],"total":5})
 //
-// If data is already a plain []interface{}, it is returned as-is.
+// If data is already a slice, it is returned as a []interface{}. Typed slices
+// such as []map[string]interface{} are also accepted via asGenericSlice.
 func ExtractItems(data interface{}) []interface{} {
 	resultMap, ok := data.(map[string]interface{})
 	if !ok {
-		if arr, ok := data.([]interface{}); ok {
+		if arr, ok := asGenericSlice(data); ok {
 			return arr
 		}
 		return nil
@@ -81,7 +106,7 @@ func ExtractItems(data interface{}) []interface{} {
 	// Strategy 1: Lark API envelope — result["data"][arrayField]
 	if dataObj, ok := resultMap["data"].(map[string]interface{}); ok {
 		if field := FindArrayField(dataObj); field != "" {
-			if items, ok := dataObj[field].([]interface{}); ok {
+			if items, ok := asGenericSlice(dataObj[field]); ok {
 				return items
 			}
 		}
@@ -90,7 +115,7 @@ func ExtractItems(data interface{}) []interface{} {
 	// Strategy 2: direct map — result[arrayField]
 	// Covers shortcut-level data like {"members":[…], "total":5, "has_more":false}
 	if field := FindArrayField(resultMap); field != "" {
-		if items, ok := resultMap[field].([]interface{}); ok {
+		if items, ok := asGenericSlice(resultMap[field]); ok {
 			return items
 		}
 	}
