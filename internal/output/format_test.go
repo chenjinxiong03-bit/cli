@@ -266,6 +266,113 @@ func TestExtractItems(t *testing.T) {
 	}
 }
 
+// Regression: shortcuts often collect results into typed slices like
+// []map[string]interface{} instead of []interface{}. ExtractItems must
+// recognise those so --format table/csv/ndjson render the array rather
+// than falling back to a key/value view of the envelope.
+func TestExtractItems_TypedSlice(t *testing.T) {
+	cases := []struct {
+		name string
+		data interface{}
+		want int
+	}{
+		{
+			name: "direct map with []map[string]interface{} under known field",
+			data: map[string]interface{}{
+				"chats": []map[string]interface{}{
+					{"chat_id": "oc_a", "name": "Alice"},
+					{"chat_id": "oc_b", "name": "Bob"},
+				},
+				"has_more": true,
+				"total":    float64(2),
+			},
+			want: 2,
+		},
+		{
+			name: "envelope with []map[string]interface{} under data.messages",
+			data: map[string]interface{}{
+				"data": map[string]interface{}{
+					"messages": []map[string]interface{}{
+						{"message_id": "om_1"},
+					},
+				},
+			},
+			want: 1,
+		},
+		{
+			name: "direct map with []map[string]interface{} under created_tasks",
+			data: map[string]interface{}{
+				"created_tasks": []map[string]interface{}{
+					{"task_id": "t1"},
+					{"task_id": "t2"},
+					{"task_id": "t3"},
+				},
+			},
+			want: 3,
+		},
+		{
+			name: "typed slice of structs via fallback",
+			data: map[string]interface{}{
+				"widgets": []struct {
+					Name string `json:"name"`
+				}{{Name: "x"}, {Name: "y"}},
+			},
+			want: 2,
+		},
+		{
+			name: "raw typed slice passed directly",
+			data: []map[string]interface{}{
+				{"k": "v"},
+			},
+			want: 1,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			items := ExtractItems(tc.data)
+			if len(items) != tc.want {
+				t.Fatalf("expected %d items, got %d (%v)", tc.want, len(items), items)
+			}
+		})
+	}
+}
+
+// Regression: --format table on the 7 affected shortcuts used to print
+// the envelope as a key/value table because the typed slice was ignored.
+// After the fix, the array should be expanded into a proper header row.
+func TestFormatValue_Table_TypedSlice(t *testing.T) {
+	data := map[string]interface{}{
+		"chats": []map[string]interface{}{
+			{"chat_id": "oc_abc", "name": "Lark test"},
+		},
+		"has_more": true,
+		"total":    float64(1),
+	}
+
+	var buf bytes.Buffer
+	FormatValue(&buf, data, FormatTable)
+	out := buf.String()
+
+	if !strings.Contains(out, "chat_id") {
+		t.Errorf("table output should expose chat_id column, got:\n%s", out)
+	}
+	if !strings.Contains(out, "oc_abc") {
+		t.Errorf("table output should contain the chat row, got:\n%s", out)
+	}
+	// The fallback bug manifested as the envelope being rendered as rows:
+	// the 'has_more' / 'total' envelope keys would appear as first-column
+	// labels. A correct render puts the array's element keys in the header
+	// and keeps envelope metadata out of the table body.
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "has_more") || strings.HasPrefix(trimmed, "total ") {
+			t.Errorf("envelope field leaked into table body:\n%s", out)
+		}
+	}
+}
+
 func TestFormatValue_LegacyFormats(t *testing.T) {
 	data := map[string]interface{}{
 		"data": map[string]interface{}{
