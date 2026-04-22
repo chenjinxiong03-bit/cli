@@ -177,11 +177,10 @@ func NewCmdServiceMethod(f *cmdutil.Factory, spec, method map[string]interface{}
 			cmd.Flags().StringVar(&opts.File, "file", "", "file to upload ([field=]path, supports - for stdin)")
 		}
 	}
-
-	_ = cmd.RegisterFlagCompletionFunc("as", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	cmdutil.RegisterFlagCompletion(cmd, "as", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return []string{"user", "bot"}, cobra.ShellCompDirectiveNoFileComp
 	})
-	_ = cmd.RegisterFlagCompletionFunc("format", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	cmdutil.RegisterFlagCompletion(cmd, "format", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return []string{"json", "ndjson", "table", "csv"}, cobra.ShellCompDirectiveNoFileComp
 	})
 
