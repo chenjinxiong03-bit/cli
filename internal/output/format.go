@@ -16,7 +16,7 @@ import (
 var knownArrayFields = []string{
 	"items", "files", "events", "rooms", "records", "nodes",
 	"members", "departments", "calendar_list", "acl_list", "freebusy_list",
-	"chats", "messages", "tasks", "created_tasks",
+	"chats", "messages", "tasks", "created_tasks", "users",
 }
 
 // asGenericSlice converts any slice value into []interface{}.
